@@ -1,0 +1,14 @@
+aws:
+  image_id: "ami-178e927e"
+  instance_type: "m1.small"
+  region: "us-east-1"
+  key_name: "AWS"
+  user: "ec2-user"
+command: "run"
+redis:
+  host: "localhost"
+  name: "queue"
+manager:
+  queue_poll_interval_sec: 60
+  task_memory_mb: 1024
+  kill_memory_mb: 1536
