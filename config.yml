@@ -5,7 +5,7 @@ aws:
   key_name: "AWS"
   user: "ec2-user"
   tag: "scrapers_manger"
-command: "sleep 500"
+command: "sleep 30"
 redis:
   url: "redis://localhost/0"
   queue: "queue"

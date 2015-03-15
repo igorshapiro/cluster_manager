@@ -10,30 +10,46 @@ class Manager
     @max_tasks = Settings.manager["tasks_per_machine"]
   end
 
-  def get_available_resource existing_resources
-    available_resource = existing_resources
+  def busiest_instance machines
+    machines
       .select{|r| r[:max_tasks] > r[:running_tasks]}
       .sort_by{|r| r[:running_tasks]}
-      .reverse
+      .reverse          # We'll run the process on the machine with most tasks
       .first
-    if available_resource.nil?
-      puts "No available machines. Creating one..."
-      available_resource = @ec2.launch_instance
-    end
-    @ec2.launch available_resource[:instance_id],
+  end
+
+  def run_on_busiest_instance existing_instances
+    instance = busiest_instance(existing_instances) || @ec2.launch_instance
+    @ec2.launch instance[:instance_id],
       "'nohup #{Settings.command} `</dev/null` > #{SecureRandom.hex(5)}.out 2>&1 &'"
     puts "Process launched"
+  end
+
+  def terminate_redundant! instances
+    available_slots = instances
+      .map{|inst| inst[:max_tasks] - inst[:running_tasks]}
+      .inject(0){|acc, n| acc + n}
+
+    # If we have (tasks_per_machine + 2) available slots - we'll shutdown an empty instance
+    if available_slots > Settings.manager["tasks_per_machine"].to_i + 2
+      puts "Shitting down empty instances. Available capacity = #{available_slots}"
+      instances
+        .select{|inst| inst[:running_tasks] == 0}
+        .each{|inst| @ec2.terminate inst[:instance_id]}
+    end
   end
 
   def run
     system "clear"
     while true
-      resources = @ec2.get_resources
-      puts resources
+      instances = @ec2.get_resources
+      puts instances
+
+      terminate_redundant! instances
 
       if @work.has_more_work?
         puts "Found more work. Launching process"
-        available_resources = get_available_resource resources
+        available_resources = run_on_busiest_instance instances
       end
 
       sleep @poll_interval_sec

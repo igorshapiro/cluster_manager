@@ -20,6 +20,7 @@ class EC2
   end
 
   def launch_instance
+    puts "Launching new instance"
     response = @client.run_instances(
       image_id: Settings.aws["image_id"],
       min_count: 1,
@@ -78,11 +79,16 @@ class EC2
       .map{|x| x.resource_id}
   end
 
+  def terminate instance_id
+    puts "Terminating #{instance_id}"
+    @client.terminate_instances(instance_ids: [instance_id])
+  end
+
   def get_instance_resources instance_id
     # tasks = `ssh #{options} #{user}@#{public_dns} ps aux | grep '#{Settings.command}'`
     # mem = `ssh #{options} #{user}@#{public_dns} free -m 2> /dev/null`
-    tasks = launch instance_id, "ps aux | grep '#{Settings.command}'"
-    mem = launch instance_id, "free -m"
+    tasks = launch(instance_id, "ps aux | grep '#{Settings.command}'").split("\n") rescue []
+    mem = launch instance_id, "free -m" rescue ""
     return nil unless mem.match(/(\d+)\s+(\d+)\s+(\d+)/)
     {
       instance_id: instance_id,
@@ -90,14 +96,17 @@ class EC2
       used: $2.to_i,
       free: $3.to_i,
       max_tasks: Settings.manager["tasks_per_machine"],
-      running_tasks: tasks.split("\n").length - 1
+      running_tasks: tasks.length
     }
   end
 
   def launch instance_id, cmd
     public_dns = get_public_dns instance_id
+    return "" if public_dns.nil? || public_dns.empty?
     user = "ec2-user"
     options = '-o "StrictHostKeyChecking no"'
-    `ssh #{options} #{user}@#{public_dns} #{cmd} 2> /dev/null`
+    cmd = "ssh #{options} #{user}@#{public_dns} #{cmd} 2> /dev/null"
+    # puts "Running: #{cmd}"
+    `#{cmd}`
   end
 end
