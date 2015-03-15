@@ -7,15 +7,22 @@ class Manager
     @ec2 = EC2.new
     @poll_interval_sec = Settings.manager["queue_poll_interval_sec"]
     @work = Work.new
-    @task_memory = Settings.manager["task_memory_mb"].to_i
+    @max_tasks = Settings.manager["tasks_per_machine"]
   end
 
   def get_available_resource existing_resources
-    available_resources = existing_resources.select{|r| r[:free] > @task_memory}
-    if available_resources.empty?
+    available_resource = existing_resources
+      .select{|r| r[:max_tasks] > r[:running_tasks]}
+      .sort_by{|r| r[:running_tasks]}
+      .reverse
+      .first
+    if available_resource.nil?
       puts "No available machines. Creating one..."
-      @ec2.launch_instance
+      available_resource = @ec2.launch_instance
     end
+    @ec2.launch available_resource[:instance_id],
+      "'nohup #{Settings.command} `</dev/null` > #{SecureRandom.hex(5)}.out 2>&1 &'"
+    puts "Process launched"
   end
 
   def run

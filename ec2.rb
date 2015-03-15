@@ -36,9 +36,6 @@ class EC2
     }])
     puts "Waiting for instance #{instance_id}..."
     wait_for_ssh instance_id
-    # puts "Created instance: #{instance.inspect}"
-    #
-    # @client.wait_until(:instance_running, instance_ids: [instance_id])
   end
 
   def wait_for_ssh instance_id
@@ -51,8 +48,8 @@ class EC2
         puts "Public DNS detected: #{public_dns}" if public_dns
       end
       if mem_stats.nil? && public_dns
-        mem_stats = free_mem instance_id
-        puts "Memory stats received" if mem_stats
+        mem_stats = get_instance_resources instance_id
+        puts "Resources received" if mem_stats
       end
       sleep(3)
     end
@@ -69,7 +66,7 @@ class EC2
 
   def get_resources
     get_instance_ids_for_tag(Settings.aws["tag"])
-      .map{|iid| free_mem(iid) }
+      .map{|iid| get_instance_resources(iid) }
       .select {|x| !x.nil?}
   end
 
@@ -81,17 +78,26 @@ class EC2
       .map{|x| x.resource_id}
   end
 
-  def free_mem instance_id
-    public_dns = get_public_dns instance_id
-    user = "ec2-user"
-    options = '-o "StrictHostKeyChecking no"'
-    response = `ssh #{options} #{user}@#{public_dns} free -m 2> /dev/null`
-    return nil unless response.match(/(\d+)\s+(\d+)\s+(\d+)/)
+  def get_instance_resources instance_id
+    # tasks = `ssh #{options} #{user}@#{public_dns} ps aux | grep '#{Settings.command}'`
+    # mem = `ssh #{options} #{user}@#{public_dns} free -m 2> /dev/null`
+    tasks = launch instance_id, "ps aux | grep '#{Settings.command}'"
+    mem = launch instance_id, "free -m"
+    return nil unless mem.match(/(\d+)\s+(\d+)\s+(\d+)/)
     {
       instance_id: instance_id,
       total: $1.to_i,
       used: $2.to_i,
-      free: $3.to_i
-    } rescue nil
+      free: $3.to_i,
+      max_tasks: Settings.manager["tasks_per_machine"],
+      running_tasks: tasks.split("\n").length - 1
+    }
+  end
+
+  def launch instance_id, cmd
+    public_dns = get_public_dns instance_id
+    user = "ec2-user"
+    options = '-o "StrictHostKeyChecking no"'
+    `ssh #{options} #{user}@#{public_dns} #{cmd} 2> /dev/null`
   end
 end

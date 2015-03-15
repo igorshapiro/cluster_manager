@@ -1,16 +1,16 @@
 aws:
-  image_id: "ami-178e927e"
+  image_id: "ami-48b69620"
   instance_type: "m1.small"
   region: "us-east-1"
   key_name: "AWS"
   user: "ec2-user"
   tag: "scrapers_manger"
-command: "BLOB= dd if=/dev/urandom bs=100MB count=1 1> /dev/null && sleep 100"
+command: "sleep 500"
 redis:
   url: "redis://localhost/0"
   queue: "queue"
 manager:
   queue_poll_interval_sec: 5
   queue_messages_threshold: 10
-  task_memory_mb: 128
+  tasks_per_machine: 4
   kill_memory_mb: 1536
