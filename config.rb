@@ -1,3 +1,5 @@
+require 'yaml'
+
 class Settings
   @@cfg = YAML.load_file('config.yml')
 
